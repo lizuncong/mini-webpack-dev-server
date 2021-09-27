@@ -1,6 +1,13 @@
 'use strict';
+const path = require('path')
 const express = require('express');
+const http = require('http')
+const mime = require('mime')
+const fs = require('fs-extra') // 暂时使用硬盘文件系统
+fs.join = path.join
 const updateCompiler = require('./utils/updateCompiler');
+
+const HASH_REGEXP = /[0-9a-f]{10,}/;
 
 class Server {
   constructor(compiler, options = {}) {
@@ -26,11 +33,7 @@ class Server {
   createServer(){
     this.server = http.createServer(this.app)
   }
-  routes(){
-    const { compiler } = this
-    const config = compiler.options
-    // this.app.use(this.middleware(config.output.path))
-  }
+
   setupDevMiddleware() {
     // middleware for serving webpack bundle
     this.middleware = this.webpackDevMiddleware();
@@ -38,7 +41,7 @@ class Server {
 
   webpackDevMiddleware(){
     const { compiler } = this
-    // 1.设置context
+    // 1.创建一个context
 
     // 2.启动编译
     compiler.watch({
@@ -55,11 +58,9 @@ class Server {
     // staticDir 静态文件根目录，它其实就是输出目录 output dist目录
     return (req, res, next) => {
       let { url } = req;
-      if(url === '/favicon.ico'){
-        return res.sendStatus(404)
-      }
+      // 1.获取文件名称
       url === '/' ? url = './index.html' : null;
-      const filePath = path.join(staticDir, url);
+      const filePath = path.join(compiler.options.output.path, url);
       try{
 
         const statObj = this.fs.statSync(filePath)
@@ -81,7 +82,7 @@ class Server {
     this.app = new express();
   }
   setupHooks(){
-    const { compiler: { compile, invalid, done} } = this;
+    const { compile, invalid, done } = this.compiler.hooks;
     compile.tap('webpack-dev-server', () => {
       console.log('compile..hook')
     });
@@ -117,6 +118,9 @@ class Server {
 
   }
 
+  listen(port, host, callback){
+    this.server.listen(port, host, callback)
+  }
 }
 
 module.exports = Server;

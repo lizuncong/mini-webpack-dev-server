@@ -8,7 +8,7 @@ const options = {
   host:'localhost',
   hot:true,
   hotOnly:undefined,
-  port:8080,
+  port:8081,
   publicPath:'/',
   stats: {
     cached:false,
@@ -24,3 +24,5 @@ function startDevServer(config, options) {
     }
   });
 }
+
+startDevServer(config, options)
