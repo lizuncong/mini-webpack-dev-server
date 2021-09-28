@@ -15,15 +15,14 @@ class Server {
     this.compiler = compiler;
     this.options = options;
     this.sockets = [];
-
+    this.socketServerImplementation = require('./servers/SockJSServer')
+    this.sockPath = 'sockjs-node'
     updateCompiler(this.compiler, this.options);
     this.setupHooks();
     this.setupApp();
     this.setupDevMiddleware();
     this.setupMiddleware();
-    // this.routes();
-    this.createServer();
-
+    this.createServer()
 
   }
 
@@ -31,7 +30,7 @@ class Server {
     this.app.use(this.middleware);
   }
   createServer(){
-    this.server = http.createServer(this.app)
+    this.listeningApp = http.createServer(this.app)
   }
 
   setupDevMiddleware() {
@@ -39,41 +38,66 @@ class Server {
     this.middleware = this.webpackDevMiddleware();
   }
 
+  // webpack-dev-middleware的主要流程
   webpackDevMiddleware(){
     const { compiler } = this
     // 1.创建一个context
-
+    const context = {
+      state: false, // false说明正在编译，true编译完成
+      callbacks: [], // 如果编译还没完成，则delay请求
+    }
+    compiler.hooks.invalid.tap('WebpackDevMiddleware', () => context.state = false);
+    compiler.hooks.run.tap('WebpackDevMiddleware', () => context.state = false);
+    compiler.hooks.done.tap('WebpackDevMiddleware', () => {
+      context.state = true;
+      const cbs = context.callbacks;
+      context.callbacks = [];
+      cbs.forEach((cb) => {
+        cb();
+      });
+    });
     // 2.启动编译
-    compiler.watch({
-
-    }, () => {
-      console.log('监听模式编译成功')
+    compiler.watch({}, (err) => {
+      console.log('编译成功', err)
     })
     // 3. 设置文件读写系统
     // const fs = new MemoryFs()
-    // this.fs = compiler.outputFileSystem = fs;
-    this.fs = compiler.outputFileSystem = fs;
+    // context.fs = compiler.outputFileSystem = fs;
+    context.fs = compiler.outputFileSystem = fs;
 
     // 4. 返回一个中间件，用来响应客户端对于产出文件的请求，比如：index.html，main.js，.json
     // staticDir 静态文件根目录，它其实就是输出目录 output dist目录
     return (req, res, next) => {
       let { url } = req;
       // 1.获取文件名称
-      url === '/' ? url = './index.html' : null;
-      const filePath = path.join(compiler.options.output.path, url);
-      try{
+      if(url === '/'){
+        url = './index.html'
+      }
+      const filename = path.join(compiler.options.output.path, url);
+      const processRequest = () => {
+        try{
 
-        const statObj = this.fs.statSync(filePath)
-        if(statObj.isFile()){
-          const content = this.fs.readFileSync(filePath)
-          res.setHeader('Content-Type', mime.getType(filePath))
-          res.send(content)
-        } else {
+          const statObj = context.fs.statSync(filename)
+          if(statObj.isFile()){
+            const content = context.fs.readFileSync(filename)
+            res.setHeader('Content-Type', mime.getType(filename))
+            res.setHeader('Content-Length', content.length);
+            res.send(content)
+          } else {
+            return res.sendStatus(404)
+          }
+        }catch(err){
+          console.log('err..', err)
           return res.sendStatus(404)
         }
-      }catch(err){
-        console.log('err..', err)
-        return res.sendStatus(404)
+      }
+
+      if (HASH_REGEXP.test(filename) || context.state) {
+        // 如果是带hash的，说明此时编译完成，可以直接处理了请求了。如果context.state为true说明编译也完成了，可以直接处理
+        processRequest();
+      } else {
+        // 正在编译中，so delay the request
+        context.callbacks.push(processRequest)
       }
     }
   }
@@ -117,9 +141,14 @@ class Server {
     this.sockWrite(sockets, 'ok');
 
   }
+  createSocketServer() {
 
+  }
   listen(port, host, callback){
-    this.server.listen(port, host, callback)
+    this.listeningApp.listen(port, host, () => {
+      this.createSocketServer();
+      callback();
+    })
   }
 }
 
