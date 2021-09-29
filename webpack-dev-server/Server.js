@@ -141,9 +141,63 @@ class Server {
     this.sockWrite(sockets, 'ok');
 
   }
-  createSocketServer() {
 
+  createSocketServer() {
+    this.socketServer = new this.socketServerImplementation(this);
+
+    this.socketServer.onConnection((connection, headers) => {
+      if (!connection) {
+        return;
+      }
+
+
+      // if (!headers || !this.checkHost(headers) || !this.checkOrigin(headers)) {
+      //   this.sockWrite([connection], 'error', 'Invalid Host/Origin header');
+      //
+      //   this.socketServer.close(connection);
+      //
+      //   return;
+      // }
+
+      this.sockets.push(connection);
+
+      this.socketServer.onConnectionClose(connection, () => {
+        const idx = this.sockets.indexOf(connection);
+
+        if (idx >= 0) {
+          this.sockets.splice(idx, 1);
+        }
+      });
+
+      // if (this.clientLogLevel) {
+      //   this.sockWrite([connection], 'log-level', this.clientLogLevel);
+      // }
+
+      // if (this.hot) {
+      //   this.sockWrite([connection], 'hot');
+      // }
+
+      // TODO: change condition at major version
+      // if (this.options.liveReload !== false) {
+      //   this.sockWrite([connection], 'liveReload', this.options.liveReload);
+      // }
+
+      // if (this.progress) {
+      //   this.sockWrite([connection], 'progress', this.progress);
+      // }
+
+      // if (this.clientOverlay) {
+      //   this.sockWrite([connection], 'overlay', this.clientOverlay);
+      // }
+
+      if (!this._stats) {
+        return;
+      }
+
+      this._sendStats([connection], this.getStats(this._stats), true);
+    });
   }
+
   listen(port, host, callback){
     this.listeningApp.listen(port, host, () => {
       this.createSocketServer();

@@ -1,1 +1,1 @@
-module.exports = ' ittle title3344'
+module.exports = ' ittle title'
