@@ -114,16 +114,7 @@ class Server {
       console.log('invalid..hook')
     });
     done.tap('webpack-dev-server', (stats) => {
-      // this.currentHash = stats.hash
-      // this.sockets.forEach(socket => {
-      //   socket.emit('hash', this.currentHash)
-      //   socket.emit('ok')
-      // })
-      this.sockets.forEach((socket) => {
-        this.socketServer.send(socket, JSON.stringify({ type: 'hash', data: stats.hash }));
-        this.socketServer.send(socket, JSON.stringify({ type: 'ok' }));
-      });
-
+      this._sendStats(this.sockets, this.getStats(stats));
     })
   }
 
