@@ -132,7 +132,7 @@ if (false) {}
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return printMe; });
 function printMe() {
-  console.log('I get called from print.js!');
+  console.log('I get called from print.js!1');
   // console.log('Updating print.js...');
 }
 
