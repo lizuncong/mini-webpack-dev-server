@@ -19,6 +19,7 @@ function startDevServer(config, options) {
   const compiler = webpack(config);
   const server = new Server(compiler, options);
   server.listen(options.port, options.host, (err) => {
+    console.log('server listening on ', options.port)
     if (err) {
       throw err;
     }

@@ -16,7 +16,7 @@ class Server {
     this.options = options;
     this.sockets = [];
     this.socketServerImplementation = require('./servers/SockJSServer')
-    this.sockPath = 'sockjs-node'
+    this.sockPath = '/sockjs-node'
     updateCompiler(this.compiler, this.options);
     this.setupHooks();
     this.setupApp();
@@ -46,9 +46,13 @@ class Server {
       state: false, // false说明正在编译，true编译完成
       callbacks: [], // 如果编译还没完成，则delay请求
     }
-    compiler.hooks.invalid.tap('WebpackDevMiddleware', () => context.state = false);
-    compiler.hooks.run.tap('WebpackDevMiddleware', () => context.state = false);
-    compiler.hooks.done.tap('WebpackDevMiddleware', () => {
+    compiler.hooks.invalid.tap('WebpackDevMiddleware2', () => {
+      context.state = false
+    });
+    compiler.hooks.run.tap('WebpackDevMiddleware', () => {
+      context.state = false
+    });
+    this.compiler.hooks.done.tap('WebpackDevMiddleware2', (stats) => {
       context.state = true;
       const cbs = context.callbacks;
       context.callbacks = [];
@@ -57,8 +61,9 @@ class Server {
       });
     });
     // 2.启动编译
-    compiler.watch({}, (err) => {
-      console.log('编译成功', err)
+    compiler.watch({
+      aggregateTimeout: 200,
+    }, (err) => {
     })
     // 3. 设置文件读写系统
     // const fs = new MemoryFs()
@@ -108,16 +113,17 @@ class Server {
   setupHooks(){
     const { compile, invalid, done } = this.compiler.hooks;
     compile.tap('webpack-dev-server', () => {
-      console.log('compile..hook')
     });
     invalid.tap('webpack-dev-server', () => {
-      console.log('invalid..hook')
     });
     done.tap('webpack-dev-server', (stats) => {
       this._sendStats(this.sockets, this.getStats(stats));
     })
   }
 
+  getStats(stats){
+    return stats.toJson(stats);
+  }
 
   sockWrite(sockets, type, data) {
     sockets.forEach((socket) => {
@@ -127,7 +133,6 @@ class Server {
 
 
   _sendStats(sockets, stats, force) {
-
     this.sockWrite(sockets, 'hash', stats.hash);
     this.sockWrite(sockets, 'ok');
 

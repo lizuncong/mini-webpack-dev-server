@@ -5,7 +5,6 @@ module.exports = class SockJSServer {
   constructor(server) {
     this.server = server;
     this.socket = sockjs.createServer();
-
     this.socket.installHandlers(this.server.listeningApp, {
       prefix: this.server.sockPath,
     });

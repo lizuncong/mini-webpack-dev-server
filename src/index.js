@@ -1,22 +1,28 @@
-let input = document.createElement('input')
+import printMe from './print.js';
 
-document.body.appendChild(input)
+function component() {
+  const element = document.createElement('div');
+  const btn = document.createElement('button');
 
+  element.innerHTML = 'Hello Webpack Dev Server';
 
-let div = document.createElement('div')
+  btn.innerHTML = 'Click me and check the console!';
+  btn.onclick = printMe;
 
-document.body.appendChild(div)
+  element.appendChild(btn);
 
-let render = () => {
-  const title = require('./title.js')
-  div.innerHTML = title;
+  return element;
 }
 
-render()
+let element = component(); // 存储 element，以在 print.js 修改时重新渲染
+document.body.appendChild(element);
 
 
-if(module.hot){
-  // 注册回调 当前index.js模块可以接收title.js的变更，
-  // 当title.js变更后可以重新调用render方法。
-  module.hot.accept(['./title.js'], render)
+if (module.hot) {
+  module.hot.accept('./print.js', function() {
+    console.log('Accepting the updated printMe module!');
+    document.body.removeChild(element);
+    element = component(); // 重新渲染 "component"，以便更新 click 事件处理函数
+    document.body.appendChild(element);
+  })
 }

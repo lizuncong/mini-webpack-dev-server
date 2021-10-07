@@ -11,11 +11,16 @@ module.exports = {
     filename: 'main.js',
     path: path.resolve(__dirname, 'dist')
   },
+  externals: {
+    SockJS: 'SockJS',
+  },
   devServer: {
     hot: true,
   },
   plugins: [
-      new HtmlWebpackPlugin(),
+      new HtmlWebpackPlugin({
+        template: 'index.html'
+      }),
       // new webpack.HotModuleReplacementPlugin()
   ]
 }
