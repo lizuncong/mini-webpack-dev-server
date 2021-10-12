@@ -1,7 +1,7 @@
 const path = require('path')
 const webpack = require('webpack')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-const HotModuleReplacementPlugin = require('./plugins/HotModuleReplacementPlugin')
+const MiniHotModuleReplacementPlugin = require('./plugins/HotModuleReplacementPlugin')
 module.exports = {
   mode: 'development',
   devtool: "source-map",
@@ -22,7 +22,7 @@ module.exports = {
       new HtmlWebpackPlugin({
         template: 'index.html'
       }),
-      // new HotModuleReplacementPlugin(),
+      new MiniHotModuleReplacementPlugin(),
       // new webpack.HotModuleReplacementPlugin()
   ]
 }
