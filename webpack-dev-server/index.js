@@ -1,5 +1,5 @@
 const webpack = require('webpack')
-const config = require('../webpack.config')
+const config = require('../webpack.config.mini')
 const Server = require('./Server')
 
 const options = {

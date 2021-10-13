@@ -22,7 +22,7 @@ module.exports = {
       new HtmlWebpackPlugin({
         template: 'index.html'
       }),
-      new MiniHotModuleReplacementPlugin(),
+      // new MiniHotModuleReplacementPlugin(),
       // new webpack.HotModuleReplacementPlugin()
   ]
 }
