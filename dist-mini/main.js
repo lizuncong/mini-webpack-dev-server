@@ -63,7 +63,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "a3770fffebdbf0c58dae";
+/******/ 	var hotCurrentHash = "a730b3d9d2b2f0ff0d5a";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -889,7 +889,7 @@ let element = component(); // 存储 element，以在 print.js 修改时重新�
 document.body.appendChild(element);
 
 
-if (module.hot) {
+if (true) {
   module.hot.accept('./print.js', function() {
     console.log('Accepting the updated printMe module!');
     document.body.removeChild(element);
@@ -981,7 +981,7 @@ sock.onmessage = (e) => {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _emitter__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./emitter */ "./webpack-dev-server/hot/emitter.js");
 
-if (module.hot) {
+if (true) {
   var lastHash;
   _emitter__WEBPACK_IMPORTED_MODULE_0__["default"].on("webpackHotUpdate", function(currentHash) {
     lastHash = currentHash;
@@ -992,9 +992,7 @@ if (module.hot) {
     });
   });
   console.log("info", "[HMR] Waiting for update signal from WDS...");
-} else {
-  throw new Error("[HMR] Hot Module Replacement is disabled.");
-}
+} else {}
 
 
 /***/ }),

@@ -1,6 +1,8 @@
 "use strict";
 
 const { SyncBailHook } = require("tapable");
+const ParserHelpers = require("webpack/lib/ParserHelpers");
+const ModuleHotAcceptDependency = require("webpack/lib/dependencies/ModuleHotAcceptDependency");
 
 const FUNCTION_CONTENT_REGEX = /^function\s?\(\)\s?\{\r?\n?|\r?\n?\}$/g;
 const INDENT_MULTILINE_REGEX = /^\t/gm;
@@ -106,15 +108,62 @@ module.exports = class HotModuleReplacementPlugin {
 
 
 				const addParserPlugins = (parser, parserOptions) => {
+
+					parser.hooks.call
+						.for("module.hot.accept")
+						.tap("HotModuleReplacementPlugin", expr => {
+							if (!parser.state.compilation.hotUpdateChunkTemplate) {
+								return false;
+							}
+							if (expr.arguments.length >= 1) {
+								const arg = parser.evaluateExpression(expr.arguments[0]);
+								let params = [];
+								let requests = [];
+								if (arg.isString()) {
+									params = [arg];
+								} else if (arg.isArray()) {
+									params = arg.items.filter(param => param.isString());
+								}
+								if (params.length > 0) {
+									params.forEach((param, idx) => {
+										const request = param.string;
+										const dep = new ModuleHotAcceptDependency(request, param.range);
+										console.log('ModuleHotAccepts...', ModuleHotAcceptDependency)
+										dep.optional = true;
+										dep.loc = Object.create(expr.loc);
+										dep.loc.index = idx;
+										parser.state.module.addDependency(dep);
+										requests.push(request);
+									});
+									if (expr.arguments.length > 1) {
+										console.log('======1', requests)
+										parser.hooks.hotAcceptCallback.call(
+											expr.arguments[1],
+											requests
+										);
+										console.log('=======2')
+										parser.walkExpression(expr.arguments[1]); // other args are ignored
+										return true;
+									} else {
+										parser.hooks.hotAcceptWithoutCallback.call(expr, requests);
+										return true;
+									}
+								}
+							}
+						});
+					// 替换src/index.js中 if (module.hot) {...} 的module.hot为true字面量
 					parser.hooks.evaluateIdentifier.for("module.hot").tap(
 						{
 							name: "HotModuleReplacementPlugin",
 							before: "NodeStuffPlugin"
 						},
 						expr => {
-							return () => true;
+							return ParserHelpers.evaluateToIdentifier(
+								"module.hot",
+								!!parser.state.compilation.hotUpdateChunkTemplate
+							)(expr);
 						}
-					);
+					)
 					parser.hooks.expression
 						.for("module.hot")
 						.tap("HotModuleReplacementPlugin", () =>  true);
@@ -122,15 +171,6 @@ module.exports = class HotModuleReplacementPlugin {
 				normalModuleFactory.hooks.parser
 					.for("javascript/auto")
 					.tap("HotModuleReplacementPlugin", addParserPlugins);
-				// normalModuleFactory.hooks.parser
-				// 	.for("javascript/dynamic")
-				// 	.tap("HotModuleReplacementPlugin", addParserPlugins);
-				// compilation.hooks.normalModuleLoader.tap(
-				// 	"HotModuleReplacementPlugin",
-				// 	context => {
-				// 		context.hot = true;
-				// 	}
-				// );
 		})
 	}
 };
