@@ -1,7 +1,6 @@
 const path = require('path')
 const webpack = require('webpack')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-const MiniHotModuleReplacementPlugin = require('./plugins/HotModuleReplacementPlugin')
 module.exports = {
   mode: 'development',
   devtool: "source-map",
@@ -12,9 +11,6 @@ module.exports = {
     filename: 'main.js',
     path: path.resolve(__dirname, 'dist')
   },
-  externals: {
-    SockJS: 'SockJS',
-  },
   devServer: {
     hot: true,
   },
@@ -22,7 +18,6 @@ module.exports = {
       new HtmlWebpackPlugin({
         template: 'index.html'
       }),
-      // new MiniHotModuleReplacementPlugin(),
-      // new webpack.HotModuleReplacementPlugin()
+      new webpack.HotModuleReplacementPlugin()
   ]
 }

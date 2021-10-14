@@ -1,6 +1,7 @@
 "use strict";
 
 const { SyncBailHook } = require("tapable");
+const { RawSource } = require("webpack-sources");
 const ParserHelpers = require("webpack/lib/ParserHelpers");
 const ModuleHotAcceptDependency = require("webpack/lib/dependencies/ModuleHotAcceptDependency");
 
@@ -45,6 +46,114 @@ module.exports = class HotModuleReplacementPlugin {
 				const hotUpdateChunkTemplate = compilation.hotUpdateChunkTemplate;
 
 				/**
+				 * compilation.hooks.record以及compilation.hooks.additionalChunkAssets用于生成补丁文件
+				 * **/
+				compilation.hooks.record.tap(
+					"HotModuleReplacementPlugin",
+					(compilation, records) => {
+						if (records.hash === compilation.hash) return;
+						records.hash = compilation.hash;
+						records.moduleHashs = {};
+						for (const module of compilation.modules) {
+							const identifier = module.identifier();
+							records.moduleHashs[identifier] = module.hash;
+						}
+						records.chunkHashs = {};
+						for (const chunk of compilation.chunks) {
+							records.chunkHashs[chunk.id] = chunk.hash;
+						}
+						records.chunkModuleIds = {};
+						for (const chunk of compilation.chunks) {
+							records.chunkModuleIds[chunk.id] = Array.from(
+								chunk.modulesIterable,
+								m => m.id
+							);
+						}
+					}
+				);
+				compilation.hooks.additionalChunkAssets.tap(
+					"HotModuleReplacementPlugin",
+					() => {
+						const records = compilation.records;
+						if (records.hash === compilation.hash) return;
+						if (
+							!records.moduleHashs ||
+							!records.chunkHashs ||
+							!records.chunkModuleIds
+						)
+							return;
+						for (const module of compilation.modules) {
+							const identifier = module.identifier();
+							let hash = module.hash;
+							module.hotUpdate = records.moduleHashs[identifier] !== hash;
+						}
+						const hotUpdateMainContent = {
+							h: compilation.hash,
+							c: {}
+						};
+						for (const key of Object.keys(records.chunkHashs)) {
+							const chunkId = isNaN(+key) ? key : +key;
+							const currentChunk = compilation.chunks.find(
+								chunk => `${chunk.id}` === key
+							);
+							if (currentChunk) {
+								const newModules = currentChunk
+									.getModules()
+									.filter(module => module.hotUpdate);
+								const allModules = new Set();
+								for (const module of currentChunk.modulesIterable) {
+									allModules.add(module.id);
+								}
+								const removedModules = records.chunkModuleIds[chunkId].filter(
+									id => !allModules.has(id)
+								);
+								if (newModules.length > 0 || removedModules.length > 0) {
+									const source = hotUpdateChunkTemplate.render(
+										chunkId,
+										newModules,
+										removedModules,
+										compilation.hash,
+										compilation.moduleTemplates.javascript,
+										compilation.dependencyTemplates
+									);
+									const {
+										path: filename,
+										info: assetInfo
+									} = compilation.getPathWithInfo(hotUpdateChunkFilename, {
+										hash: records.hash,
+										chunk: currentChunk
+									});
+									compilation.additionalChunkAssets.push(filename);
+									compilation.emitAsset(
+										filename,
+										source,
+										Object.assign({ hotModuleReplacement: true }, assetInfo)
+									);
+									hotUpdateMainContent.c[chunkId] = true;
+									currentChunk.files.push(filename);
+									compilation.hooks.chunkAsset.call(currentChunk, filename);
+								}
+							} else {
+								hotUpdateMainContent.c[chunkId] = false;
+							}
+						}
+						console.log('==============12', RawSource)
+						const source = new RawSource(JSON.stringify(hotUpdateMainContent));
+						const {
+							path: filename,
+							info: assetInfo
+						} = compilation.getPathWithInfo(hotUpdateMainFilename, {
+							hash: records.hash
+						});
+						compilation.emitAsset(
+							filename,
+							source,
+							Object.assign({ hotModuleReplacement: true }, assetInfo)
+						);
+					}
+				);
+
+				/**
 				 * 以下代码主要是为了注入hmr runtime代码
 				 * **/
 				const mainTemplate = compilation.mainTemplate;
@@ -52,7 +161,8 @@ module.exports = class HotModuleReplacementPlugin {
 				mainTemplate.hooks.bootstrap.tap(
 					"HotModuleReplacementPlugin",
 					(source, chunk, hash) => {
-						source = mainTemplate.hooks.hotBootstrap.call(source, chunk, hash);
+						// source = mainTemplate.hooks.hotBootstrap.call(source, chunk, hash); // 热更新运行时代码
+						source = ''
 						return [
 							source,
 							"",
@@ -100,13 +210,21 @@ module.exports = class HotModuleReplacementPlugin {
 						return [
 							`${source},`,
 							`hot: hotCreateModule(${varModuleId}),`,
-							"parents: (hotCurrentParentsTemp = hotCurrentParents, hotCurrentParents = [], hotCurrentParentsTemp),",
+							"parents: [],",
 							"children: []"
 						].join('\n');
 					}
 				);
 
 
+				compilation.dependencyFactories.set(
+					ModuleHotAcceptDependency,
+					normalModuleFactory
+				);
+				compilation.dependencyTemplates.set(
+					ModuleHotAcceptDependency,
+					new ModuleHotAcceptDependency.Template()
+				);
 				const addParserPlugins = (parser, parserOptions) => {
 
 					parser.hooks.call
@@ -128,7 +246,6 @@ module.exports = class HotModuleReplacementPlugin {
 									params.forEach((param, idx) => {
 										const request = param.string;
 										const dep = new ModuleHotAcceptDependency(request, param.range);
-										console.log('ModuleHotAccepts...', ModuleHotAcceptDependency)
 										dep.optional = true;
 										dep.loc = Object.create(expr.loc);
 										dep.loc.index = idx;
@@ -136,12 +253,10 @@ module.exports = class HotModuleReplacementPlugin {
 										requests.push(request);
 									});
 									if (expr.arguments.length > 1) {
-										console.log('======1', requests)
 										parser.hooks.hotAcceptCallback.call(
 											expr.arguments[1],
 											requests
 										);
-										console.log('=======2')
 										parser.walkExpression(expr.arguments[1]); // other args are ignored
 										return true;
 									} else {
@@ -171,6 +286,12 @@ module.exports = class HotModuleReplacementPlugin {
 				normalModuleFactory.hooks.parser
 					.for("javascript/auto")
 					.tap("HotModuleReplacementPlugin", addParserPlugins);
+				// compilation.hooks.normalModuleLoader.tap(
+				// 	"HotModuleReplacementPlugin",
+				// 	context => {
+				// 		context.hot = true;
+				// 	}
+				// );
 		})
 	}
 };

@@ -1,10 +1,28 @@
-### 什么是HMR
+### 运行
+- npm run dev 会以官方的webpack-dev-server启动项目，对应的配置文件是webpack.config.js
+- node webpack-dev-server 运行的是迷你版本的webpack-dev-server，对应的配置文件是webpack.config.mini.js
+
+### HMR
 Hot Module Replacement(模块热更新)是指当我们对代码修改并保存后，webpack将会对代码进行重新打包，并将新的模块发送到浏览器端，
 浏览器用新的模块替换掉旧的模块，以实现在不刷新浏览器的前提下更新页面
 
 为了实现HMR，浏览器和服务器必须建立一个websocket连接。服务端监听文件修改，生成一个[hash].hot-update.json文件告诉浏览器有哪些模块修改了，
-以及[chunk].[hash].hot-update.js文件。
+以及[chunk].[hash].hot-update.js补丁文件。
 
+- webpack配置项入口entry增加两个文件，用于注入websocket相关代码
+    + client/index.js用于和服务端建立websocket连接
+    + hot/dev-server.js。当浏览器通过websocket接收到服务端发出的ok信息后，dev-server.js执行module.hot.check热更新检查
+- HotModuleReplacementPlugin.js用于向main.js中注入热更新运行时代码，以及生成.hot-update.json和.hot-update.js补丁文件
+    + 向window挂载webpackHotUpdate方法
+    + compilation.mainTemplate.hooks一系列的hooks就是用于webpack bootstrap代码中注入热更新运行时代码
+    + compilation.hooks.additionalChunkAssets和compilation.hooks.record这两个钩子用于生成.hot-update.json及.hot-update.js补丁文件
+- HotModuleReplacement.runtime.js模块热更新运行时代码热更新的流程：
+    + client/index.js接收到服务端ok信息，hot/dev-server执行module.hot.check热更新检查
+    + module.hot.check方法里面调用hotDownloadManifest方法向服务端请求.hot-update.json文件
+    + 浏览器拿到.hot-update.json里面的模块，遍历.c属性中的键，向服务器请求.hot-update.js补丁文件
+    + 补丁文件是个自执行脚本，webpackHotUpdate("main", {/**模块对象**/})
+    + window.webpackHotUpdate方法调用hotAddUpdateChunk方法收集需要更新的模块，并替换掉旧模块，执行hotApply方法
+    + hotApply主要是从缓存中删除旧模块，并且执行module.hot.accept回调
 
 ### webpack-dev-server/lib/Server.js
 webpack-dev-server就是一个express服务器，主要逻辑在Server.js文件中，Server.js主要做了以下处理：
@@ -45,28 +63,5 @@ webpack-dev-server就是一个express服务器，主要逻辑在Server.js文件�
 - hotCreateRequire 会帮我们给模块module的parents，children赋值。
 
 
-#### HotModuleReplacement.runtime
-- 调用module.hot.check方法
-- 调用hotDownloadManifest
-- 调用hotDownloadUpdateChunk
-- webpackHotUpdate
-- hotAddUpdateChunk
-- hotApply
-- 从缓存中删除旧模块
-- 执行accept的回调
-
-
-#### 为什么需要2个hash值
-lastHash，currentHash
-
-第1次编译的时候，lastHash = currentHash = hash1
-
-客户端里的代码和服务器是一致的，都是hash1
-
-这个时候服务器重新编译了
-
-重新得到1个新的hash值，hash2
-
-还会创建一个hash1的补丁包，包里会说明hash1到hash2哪些代码块发生了变更，以及发生了哪些变更
 
 

@@ -3,7 +3,9 @@ class EventEmitter {
     this.events = {}
   }
   on(evtName, cb){
-    this.events[evtName] = (this.events[evtName] || []).push(cb)
+    const cbs = this.events[evtName] || [];
+    cbs.push(cb)
+    this.events[evtName] = cbs
   }
   emit(evtName, ...args){
     (this.events[evtName] || []).forEach(cb => {
